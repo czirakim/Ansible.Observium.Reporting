@@ -1,0 +1,82 @@
+---
+- hosts: observium
+  connection: local
+  vars:
+    day: '{{ansible_date_time.date}}'
+    time: '{{ansible_date_time.time}}'
+
+
+  tasks:
+
+    - name: Initiate Lists
+      set_fact:
+        devices: []
+
+    - name: Get OS devices
+      uri:
+        url: "https://{{ansible_host}}/api/v0/devices/?os={{os}}"
+        method: GET
+        validate_certs: no
+        return_content: yes
+        user: "{{observium_user}}"
+        password: "{{observium_password}}"
+        force_basic_auth: yes
+        body_format: json
+      register: result
+
+    - set_fact:
+        devices_list: "{{result['json']['devices']}}"
+
+    - name: Add new JSON Objects to List
+      set_fact:
+         devices: "{{ devices +
+                       [{ 'Hostname': item.value.hostname,
+                          'Hardware': item.value.hardware,
+                          'Vendor': item.value.vendor,
+                          'Version': item.value.version,
+                          'Features': item.value.features,
+                          'Serial': item.value.serial  }] }}"
+
+      loop: "{{ devices_list|dict2items }}"
+
+    - name: Creating an empty file
+      copy:
+        dest: "devices.txt"
+        content: ""
+
+    - name: file
+      lineinfile:
+        dest: devices.txt
+        line: "{{item.Hostname}},{{item.Vendor}},{{item.Hardware}},{{item.Version}},{{item.Features}},{{item.Serial}}"
+      loop: "{{ devices }}"
+
+
+    - name: display file
+      command: cat devices.txt
+      register: result
+
+    - name: print file
+      debug:
+        msg: "{{result.stdout_lines}}"
+    
+    - name: post a file in gitlab
+      uri:
+        url: "https://git.website.com/api/v4/projects/11/repository/commits"
+        method: POST
+        validate_certs: no
+        body_format: json
+        status_code: 201
+        headers:
+          PRIVATE-TOKEN: "{{git_token}}"
+        body: {
+                "branch": "master",
+                "commit_message": "ansible report on devices with {{os}} commit message",
+                "actions": [
+                 {
+                   "action": "create",
+                   "file_path": "devices_{{os}}_{{day}}_{{time}}.txt",
+                   "content": "{{result.stdout_lines | to_nice_json}}"
+                 }
+               ]
+        }
+        
