@@ -9,7 +9,7 @@ This project is for creating a report per os type and it will give you for each 
 <br>and also post it in a Gitlab Repo.
 
 <br> On my blog post you can find more info: 
-<br> https://
+<br> https://latebits.com/2021/08/17/observium-reporting-with-ansible/
 
 
 ## Credits
